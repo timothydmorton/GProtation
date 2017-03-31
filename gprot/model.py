@@ -25,22 +25,22 @@ from celerite import terms
 
 # Define the custom kernel
 class RotationTerm(terms.Term):
-    parameter_names = ("log_amp", "log_timescale", "log_period", "log_factor")
+    parameter_names = ("ln_amp", "ln_timescale", "ln_period", "ln_factor")
 
     def get_real_coefficients(self):
-        f = np.exp(self.log_factor)
+        f = np.exp(self.ln_factor)
         return (
-            np.exp(self.log_amp) * (1.0 + f) / (2.0 + f),
-            np.exp(-self.log_timescale),
+            np.exp(self.ln_amp) * (1.0 + f) / (2.0 + f),
+            np.exp(-self.ln_timescale),
         )
 
     def get_complex_coefficients(self):
-        f = np.exp(self.log_factor)
+        f = np.exp(self.ln_factor)
         return (
-            np.exp(self.log_amp) / (2.0 + f),
+            np.exp(self.ln_amp) / (2.0 + f),
             0.0,
-            np.exp(-self.log_timescale),
-            2*np.pi*np.exp(-self.log_period),
+            np.exp(-self.ln_timescale),
+            2*np.pi*np.exp(-self.ln_period),
         )
 
 
@@ -444,7 +444,7 @@ class GPRotModelCelerite(GPRotModel):
         return self._bounds
 
     def sample_from_prior(self, N, seed=None):
-        return np.array([np.random.uniform(*b) for b in self.bounds])
+        return np.array([np.random.uniform(lo, hi, size=N) for lo,hi in self.bounds]).T
 
 
     def lnprior(self, theta):

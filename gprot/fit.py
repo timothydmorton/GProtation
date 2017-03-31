@@ -52,7 +52,9 @@ def write_samples(mod, df, resultsdir='results', true_period=None):
 def fit_emcee3(mod, nwalkers=500, verbose=False, nsamples=5000, targetn=6,
                 iter_chunksize=10, pool=None, overwrite=False,
                 maxiter=100, sample_directory='mcmc_chains',
-                nburn=3, mixedmoves=True, resultsdir='results', **kwargs):
+                nburn=3, mixedmoves=True, resultsdir='results', 
+                test=False,
+                **kwargs):
     """fit model using Emcee3 
 
     modeled after https://github.com/dfm/gaia-kepler/blob/master/fit.py
@@ -130,7 +132,7 @@ def fit_emcee3(mod, nwalkers=500, verbose=False, nsamples=5000, targetn=6,
         except emcee3.autocorr.AutocorrError:
             tau_max = 0
             continue
-        if neff > targetn:
+        if neff > targetn or test:
             done = True
 
     burnin = int(nburn*tau_max)
