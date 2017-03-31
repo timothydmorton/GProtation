@@ -1,5 +1,6 @@
 import numpy as np
 import acor
+# import emcee.autocorr as acor
 
 from .peakdetect import peakdetect
 

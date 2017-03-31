@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import logging
 
 # These are the "Tableau 20" colors as RGB.    
 tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),    
@@ -17,7 +18,10 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from emcee3.backends import HDFBackend
+try:
+    from emcee3.backends import HDFBackend
+except ImportError:
+    logging.warning('Emcee3 not installed.')
 
 from .model import GPRotModel, GPRotModel2
 

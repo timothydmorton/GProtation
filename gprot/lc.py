@@ -108,7 +108,7 @@ class LightCurve(object):
 
         if smooth is not None:
             cadence = np.median(np.diff(lags))
-            Nbox = smooth / cadence 
+            Nbox = int(smooth / cadence)
             if Nbox >= 3:
                 ac = convolve(ac, boxcar(Nbox)/float(Nbox), mode='reflect')
 

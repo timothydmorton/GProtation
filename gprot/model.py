@@ -6,18 +6,44 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-import george
-from george.kernels import ExpSine2Kernel, ExpSquaredKernel, WhiteKernel, CosineKernel
+# import george
+# from george.kernels import ExpSine2Kernel, ExpSquaredKernel, WhiteKernel, CosineKernel
 import glob
-import emcee
+# import emcee
 import corner
-import h5py
+# import h5py
 import subprocess
 import scipy.optimize as spo
 import time
 import os
 import pandas as pd
+
 from scipy.misc import logsumexp
+
+import celerite
+from celerite import terms
+
+# Define the custom kernel
+class RotationTerm(terms.Term):
+    parameter_names = ("log_amp", "log_timescale", "log_period", "log_factor")
+
+    def get_real_coefficients(self):
+        f = np.exp(self.log_factor)
+        return (
+            np.exp(self.log_amp) * (1.0 + f) / (2.0 + f),
+            np.exp(-self.log_timescale),
+        )
+
+    def get_complex_coefficients(self):
+        f = np.exp(self.log_factor)
+        return (
+            np.exp(self.log_amp) / (2.0 + f),
+            0.0,
+            np.exp(-self.log_timescale),
+            2*np.pi*np.exp(-self.log_period),
+        )
+
+
 
 def lnGauss(x, mu, sigma):
     return -0.5 * ((x - mu)**2/(sigma**2)) + np.log(1./np.sqrt(2*np.pi*sigma**2))
@@ -40,6 +66,7 @@ class GPRotModel(object):
                (-0.69, 4.61)) # 0.5 - 100d range
 
     param_names = ('ln_A', 'ln_l', 'ln_G', 'ln_sigma', 'ln_period')
+    _ln_period_index = 4 #index of period parameter 
 
     _default_gp_prior_mu = (-13, 7.2, -2.3, -17)
     _default_gp_prior_sigma = (5.7, 1.2, 1.4, 5)
@@ -118,11 +145,12 @@ class GPRotModel(object):
         np.random.seed(seed)
         m = np.ones(N, dtype=bool)
         nbad = m.sum()
+        # BUG beware if period index is not -1
         while nbad > 0:
             rn = np.random.randn(N * (self.ndim-1)).reshape((N, self.ndim-1))
             for i in range(self.ndim - 1):
                 samples[m, i] = rn[m, i]*self.gp_prior_sigma[i] + self.gp_prior_mu[i]
-            samples[m, -1] = self.sample_period_prior(nbad)
+            samples[m, -1] = self.sample_period_prior(nbad) 
             lnp = np.array([self.lnprior(theta) for theta in samples])
             m = ~np.isfinite(lnp)
             nbad = m.sum()
@@ -136,7 +164,7 @@ class GPRotModel(object):
         for i, (lo, hi) in enumerate(self.bounds):
             if theta[i] < lo or theta[i] > hi:
                 return -np.inf
-        if theta[-1] < self.pmin or theta[-1] > self.pmax:
+        if theta[self._ln_period_index] < self.pmin or theta[self._ln_period_index] > self.pmax:
             return -np.inf
 
         # Don't let SE correlation length be shorter than P.
@@ -152,7 +180,7 @@ class GPRotModel(object):
         lnpr = np.sum(lnGauss(np.array(theta[:-1]), 
                               self.gp_prior_mu, self.gp_prior_sigma))
 
-        lnpr += self.lnprior_period(theta[-1])
+        lnpr += self.lnprior_period(theta[self._ln_period_index])
 
         return lnpr
 
@@ -169,7 +197,8 @@ class GPRotModel(object):
         else:
             fig = ax.get_figure()
 
-        ps = np.linspace(self.bounds[-1][0], self.bounds[-1][1], 1000)
+        ps = np.linspace(self.bounds[self._ln_period_index][0], 
+                                    self.bounds[self._ln_period_index][1], 1000)
         lnp = np.array([self.lnprior_period(p) for p in ps])
 
         if log:
@@ -196,20 +225,20 @@ class GPRotModel(object):
 
         fig = plt.figure(figsize=(12,6))
 
-        gs1 = gridspec.GridSpec(n/2, 1)
+        gs1 = gridspec.GridSpec(n//2, 1)
         gs1.update(bottom=0.53, top=0.9, left=0.45, hspace=0)
         ax1 = plt.subplot(gs1[0,:])
-        axes1 = [ax1] + [plt.subplot(gs1[i,:], sharex=ax1) for i in range(1, n/2)]
-        for ax, pmax in zip(axes1, pmax_list[:n/2]):
+        axes1 = [ax1] + [plt.subplot(gs1[i,:], sharex=ax1) for i in range(1, n//2)]
+        for ax, pmax in zip(axes1, pmax_list[:n//2]):
             per, _, _, _, _ = self.lc.acf_prot(pmax=pmax, ax=ax, **acf_kwargs)
             pbest.append(per)
         ax1.set_xlim(xmin=0)
 
-        gs2 = gridspec.GridSpec(n - n/2, 1)
+        gs2 = gridspec.GridSpec(n - n//2, 1)
         gs2.update(top=0.47, bottom=0.05, left=0.45, hspace=0)
         ax2 = plt.subplot(gs2[0,:])
-        axes2 = [ax2] + [plt.subplot(gs2[i,:], sharex=ax2) for i in range(1, n - n/2)]
-        for ax, pmax in zip(axes2, pmax_list[n/2:]):
+        axes2 = [ax2] + [plt.subplot(gs2[i,:], sharex=ax2) for i in range(1, n - n//2)]
+        for ax, pmax in zip(axes2, pmax_list[n//2:]):
             per, _, _, _, _ = self.lc.acf_prot(pmax=pmax, ax=ax, **acf_kwargs)
             pbest.append(per)
         ax2.set_xlim(xmin=0)
@@ -226,7 +255,7 @@ class GPRotModel(object):
         return fig
 
     def sample_period_prior(self, N):
-        loP, hiP = self.bounds[-1]
+        loP, hiP = self.bounds[self._ln_period_index]
         if self.pmin > loP:
             loP = self.pmin
         if self.pmax < hiP:
@@ -292,7 +321,7 @@ class GPRotModel(object):
         self._acf_results = [self.lc.acf_prot(pmax=p, **kws) for p in self.acf_pmax]
 
     def _lnp_in_bounds(self, lnp):
-        return lnp > self.bounds[-1][0] and lnp < self.bounds[-1][1]
+        return lnp > self.bounds[self._ln_period_index][0] and lnp < self.bounds[self._ln_period_index][1]
 
     @property
     def period_mixture(self):
@@ -333,7 +362,7 @@ class GPRotModel(object):
         P = np.exp(theta[4])
         return A * ExpSquaredKernel(l) * ExpSine2Kernel(G, P) + WhiteKernel(sigma)        
 
-    def gp(self, theta, x=None, yerr=None):
+    def gp(self, theta, x=None, y=None, yerr=None):
         if x is None:
             x = self.x
         if yerr is None:
@@ -348,7 +377,7 @@ class GPRotModel(object):
 
     def lnlike_function(self, theta, x, y, yerr):
         try:
-            gp = self.gp(theta, x=x, yerr=yerr)
+            gp = self.gp(theta, x=x, y=y, yerr=yerr)
         except (ValueError, np.linalg.LinAlgError):
             return -np.inf
         lnl = gp.lnlikelihood(y, quiet=True)
@@ -394,6 +423,57 @@ class GPRotModel(object):
         post_file = '{}post_equal_weights.dat'.format(basename)
         data = np.loadtxt(post_file)
         return pd.DataFrame(data[:,:-1], columns=cls.param_names)
+
+class GPRotModelCelerite(GPRotModel):
+    param_names = RotationTerm.parameter_names
+    _default_bounds = None # get from LightCurve
+    _ln_period_index = 2
+
+    def __init__(self, lc, **kwargs):
+        super(GPRotModelCelerite, self).__init__(lc, **kwargs)
+        self._kernel = None
+
+    @property
+    def bounds(self):
+        if self._bounds is None:
+            self._bounds = [np.log(np.var(self.y) * np.array([0.1, 10.0])),
+                np.log([np.max(np.diff(self.x)), self.x.max() - self.x.min()]),
+                np.log([3*np.median(np.diff(self.x)), 0.5*self.x.max()-self.x.min()]),
+                [-5.0, 5.0]]
+
+        return self._bounds
+
+    def sample_from_prior(self, N, seed=None):
+        return np.array([np.random.uniform(*b) for b in self.bounds])
+
+
+    def lnprior(self, theta):
+        """Only 
+        """
+        return self.lnprior_period(theta[self._ln_period_index])
+
+    @property
+    def kernel(self):
+        if self._kernel is None:
+            self._kernel = RotationTerm(np.log(np.var(self.y)), np.log(10), np.log(2.0), np.log(1.0),
+                                        bounds=self.bounds)
+        return self._kernel
+
+    def gp(self, theta, x=None, y=None, yerr=None):
+        gp = celerite.GP(self.kernel, mean=np.median(y))
+        gp.compute(x, yerr)
+        return gp
+
+    def lnlike_function(self, theta, x, y, yerr):
+        try:
+            gp = self.gp(theta, x=x, y=y, yerr=yerr)
+        except (ValueError, np.linalg.LinAlgError):
+            return -np.inf
+        lnl = gp.log_likelihood(y)
+
+        return lnl if np.isfinite(lnl) else -np.inf
+
+
 
 class GPRotModel2(GPRotModel):
     """ Playing with model a bit...
