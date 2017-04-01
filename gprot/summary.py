@@ -12,6 +12,7 @@ from .model import GPRotModel, GPRotModel2
 def corner_plot(df, mod, true_period=None, pct=0.99, **kwargs):
     """ Makes corner plot for basename
     """
+
     ndim = len(mod.param_names)
     labels = mod.param_names
 

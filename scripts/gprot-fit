@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('agg')
 
-from gprot.model import GPRotModel, GPRotModel2
+from gprot.model import GPRotModel, GPRotModel2, GPRotModelCelerite
 from gprot.config import POLYCHORD
 from gprot.fit import fit_mnest, fit_emcee3
 
@@ -32,7 +32,8 @@ def get_model(i, aigrain=True, kepler=False,
                 resultsdir='results', quarters=None, clever=True,
                 bestchunk=None, pmax=None, filter=False, tag=None, 
                 altmodel=False, nochunks=False, npoints=600, 
-                acf_prior=False, sap=False, offline=False, **kwargs):
+                acf_prior=False, sap=False, offline=False, 
+                celerite=True, **kwargs):
     if not aigrain and not kepler:
         raise ValueError('Must specify either --aigrain or --kepler.')
         sys.exit(1)
@@ -72,7 +73,9 @@ def get_model(i, aigrain=True, kepler=False,
         except TypeError:
             pmax = np.log(bestchunk)
 
-    if altmodel:
+    if celerite:
+        mod = GPRotModelCelerite(lc, pmax=pmax, acf_prior=acf_prior)
+    elif altmodel:
         mod = GPRotModel2(lc, pmax=pmax, acf_prior=acf_prior)
     else:
         if kepler:
@@ -186,6 +189,7 @@ if __name__=='__main__':
                         help="Test, don't actually run. Flag has no effect if sampler " + 
                              "is set to emcee3.")
     parser.add_argument('--offline', action='store_true', help='enable offline kplr data access')
+    parser.add_argument('--celerite', action='store_true', help='use celerite for GP')
 
     parser.add_argument('--altmodel', action='store_true')
     parser.add_argument('--nochunks', action='store_true')
@@ -193,6 +197,9 @@ if __name__=='__main__':
     args = vars(parser.parse_args())
 
     args['pool'] = schwimmbad.choose_pool(mpi=args.pop('mpi'), processes=args.pop('n_cores'))
+
+    if args['chunksize'] == -1:
+        args['chunksize'] = None
 
     stars = args.pop('stars')
     sampler = args.pop('sampler')

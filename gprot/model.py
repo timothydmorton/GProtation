@@ -25,7 +25,7 @@ from celerite import terms
 
 # Define the custom kernel
 class RotationTerm(terms.Term):
-    parameter_names = ("ln_amp", "ln_timescale", "ln_period", "ln_factor")
+    parameter_names = ("ln_amp", "ln_timescale", "ln_factor", "ln_period")
 
     def get_real_coefficients(self):
         f = np.exp(self.ln_factor)
