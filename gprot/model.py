@@ -428,6 +428,7 @@ class GPRotModelCelerite(GPRotModel):
     param_names = RotationTerm.parameter_names
     _default_bounds = None # get from LightCurve
     _ln_period_index = 2
+    _default_period_bounds = (np.log(0.5), np.log(100))
 
     def __init__(self, lc, **kwargs):
         super(GPRotModelCelerite, self).__init__(lc, **kwargs)
@@ -438,8 +439,7 @@ class GPRotModelCelerite(GPRotModel):
         if self._bounds is None:
             self._bounds = [np.log(np.var(self.y) * np.array([0.1, 10.0])),
                 np.log([np.max(np.diff(self.x)), self.x.max() - self.x.min()]),
-                np.log([3*np.median(np.diff(self.x)), 0.5*self.x.max()-self.x.min()]),
-                [-5.0, 5.0]]
+                [-5.0, 5.0], self._default_period_bounds]
 
         return self._bounds
 
@@ -450,6 +450,10 @@ class GPRotModelCelerite(GPRotModel):
     def lnprior(self, theta):
         """Only 
         """
+        for i, (lo, hi) in enumerate(self.bounds):
+            if theta[i] < lo or theta[i] > hi:
+                return -np.inf
+
         return self.lnprior_period(theta[self._ln_period_index])
 
     @property
