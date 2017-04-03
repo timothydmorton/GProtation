@@ -66,8 +66,9 @@ class GPRotModel(object):
                (-0.69, 4.61)) # 0.5 - 100d range
 
     param_names = ('ln_A', 'ln_l', 'ln_G', 'ln_sigma', 'ln_period')
-    _ln_period_index = 4 #index of period parameter 
+    _ln_period_index = -1 #index of period parameter 
 
+    flat_gp_prior = False
     _default_gp_prior_mu = (-13, 7.2, -2.3, -17)
     _default_gp_prior_sigma = (5.7, 1.2, 1.4, 5)
 
@@ -145,11 +146,15 @@ class GPRotModel(object):
         np.random.seed(seed)
         m = np.ones(N, dtype=bool)
         nbad = m.sum()
-        # BUG beware if period index is not -1
+        # BUG beware if period index is not -1 (should be?)
         while nbad > 0:
             rn = np.random.randn(N * (self.ndim-1)).reshape((N, self.ndim-1))
             for i in range(self.ndim - 1):
-                samples[m, i] = rn[m, i]*self.gp_prior_sigma[i] + self.gp_prior_mu[i]
+                if not self.flat_gp_prior:
+                    samples[m, i] = rn[m, i]*self.gp_prior_sigma[i] + self.gp_prior_mu[i]
+                else:
+                    lo, hi = self.bounds[i]
+                    samples[m, i] = np.random.random(size=N)*(hi-lo) + lo
             samples[m, -1] = self.sample_period_prior(nbad) 
             lnp = np.array([self.lnprior(theta) for theta in samples])
             m = ~np.isfinite(lnp)
@@ -427,8 +432,10 @@ class GPRotModel(object):
 class GPRotModelCelerite(GPRotModel):
     param_names = RotationTerm.parameter_names
     _default_bounds = None # get from LightCurve
-    _ln_period_index = 2
+    _ln_period_index = -1
     _default_period_bounds = (np.log(0.5), np.log(100))
+
+    flat_gp_prior = True
 
     def __init__(self, lc, **kwargs):
         super(GPRotModelCelerite, self).__init__(lc, **kwargs)
@@ -442,10 +449,6 @@ class GPRotModelCelerite(GPRotModel):
                 [-5.0, 5.0], self._default_period_bounds]
 
         return self._bounds
-
-    def sample_from_prior(self, N, seed=None):
-        return np.array([np.random.uniform(lo, hi, size=N) for lo,hi in self.bounds]).T
-
 
     def lnprior(self, theta):
         """Only 
