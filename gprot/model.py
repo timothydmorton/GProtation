@@ -468,6 +468,7 @@ class GPRotModelCelerite(GPRotModel):
 
     def gp(self, theta, x=None, y=None, yerr=None):
         gp = celerite.GP(self.kernel, mean=np.median(y))
+        gp.set_parameter_vector(theta)
         gp.compute(x, yerr)
         return gp
 
