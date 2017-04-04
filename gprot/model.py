@@ -154,7 +154,7 @@ class GPRotModel(object):
                     samples[m, i] = rn[m, i]*self.gp_prior_sigma[i] + self.gp_prior_mu[i]
                 else:
                     lo, hi = self.bounds[i]
-                    samples[m, i] = np.random.random(size=N)*(hi-lo) + lo
+                    samples[:, i] = np.random.random(size=N)*(hi-lo) + lo
             samples[m, -1] = self.sample_period_prior(nbad) 
             lnp = np.array([self.lnprior(theta) for theta in samples])
             m = ~np.isfinite(lnp)
