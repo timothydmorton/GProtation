@@ -35,7 +35,7 @@ setup(name = "gprot",
     url = "https://github.com/ruthangus/GProtation",
     packages = ['gprot'],
     package_data = {'gprot':['data/*']},
-    scripts = ['scripts/gprot-fit', 'scripts/gprot-acf', 'scripts/gprot-trace'],
+    scripts = ['scripts/gprot-fit', 'scripts/gprot-acf', 'scripts/gprot-trace', 'scripts/gprot-summarize'],
     classifiers=[
       'Development Status :: 3 - Alpha',
       'Intended Audience :: Science/Research',
